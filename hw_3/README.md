@@ -1,6 +1,6 @@
 # HW_Motion_Planning_For_Mobile_Robots
-'''
-  void samplingOnce(Eigen::Vector3d &sample, bool ball)
+
+`  void samplingOnce(Eigen::Vector3d &sample, bool ball)
   {
     if (ball)
     {
@@ -22,4 +22,4 @@
       sample += origin_;
     }
   };
-'''
+`
