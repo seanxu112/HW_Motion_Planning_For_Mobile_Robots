@@ -249,9 +249,9 @@ namespace path_plan
       {
         /* biased random sampling */
         Eigen::Vector3d x_rand;
-        sampler_.samplingOnce(x_rand, goal_found);
+        sampler_.samplingOnce(x_rand, false);
         // samplingOnce(x_rand);
-        if (goal_found)
+        if (false)
         {
           double c_max = goal_node_->cost_from_start;
           S_mat(0,0) = c_max;
