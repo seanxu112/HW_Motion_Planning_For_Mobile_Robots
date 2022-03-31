@@ -1,4 +1,9 @@
 # HW_Motion_Planning_For_Mobile_Robots
+<!-- ![alt text](RRT*.png) -->
+<table>
+  <td> <img src="RRT*.png" width="400" height="400" /> </td>
+  <td> <img src="Informed_RRT*.png" width="400" height="400" /> </td>
+</table>
 
 ```
 for (auto &curr_node : neighbour_nodes)
@@ -14,6 +19,8 @@ for (auto &curr_node : neighbour_nodes)
   }
 }
 ```
+
+Every time we find a new node, we check all the nodes in the vincinity, and check whether this neighbor node would give us a lower cost from start than the current neighbor. If this neighbor node has a lower cost, we compute update this new node's parent to this neighbor node and update the costs accordingly.
 
 ```
 for (auto &curr_node : neighbour_nodes)
@@ -37,13 +44,14 @@ for (auto &curr_node : neighbour_nodes)
 }
 ```
 
+Similar to above, we check the neighbor nodes around the new node. Instead of checking the new node, we check if any of the neighbor nodes can have a lower cost if the neighbor node's parent is the new node. If so, we update this neighbor node's parent to be the new node.
+
 ```
 void samplingOnce(Eigen::Vector3d &sample, bool ball)
   {
     if (ball)
     {
-      // 在spherical coordinate里面采样
-      // 用acos得到角度theta，因为theta在
+      // Uniformly Sample in Spherical Coord
       double theta = uniform_rand_pi(gen_);
       double phi = uniform_rand_2pi(gen_);
       double radius = std::pow(uniform_rand_(gen_), 1/3.);
@@ -61,3 +69,4 @@ void samplingOnce(Eigen::Vector3d &sample, bool ball)
     }
   };
 ```
+I changed the SamplingOnce method. The boolean ball is true when goal_found == true. Instead of rejection method, I have decided to uniformly sample in the spherical coordinates. Then convert it back to Cartesian Coordinates. 
