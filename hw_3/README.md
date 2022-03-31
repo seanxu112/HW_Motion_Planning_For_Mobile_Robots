@@ -46,6 +46,7 @@ for (auto &curr_node : neighbour_nodes)
 
 Similar to above, we check the neighbor nodes around the new node. Instead of checking the new node, we check if any of the neighbor nodes can have a lower cost if the neighbor node's parent is the new node. If so, we update this neighbor node's parent to be the new node.
 
+### Uniform Sampling for Informed RRT*
 ```
 void samplingOnce(Eigen::Vector3d &sample, bool ball)
   {
@@ -70,3 +71,49 @@ void samplingOnce(Eigen::Vector3d &sample, bool ball)
   };
 ```
 I changed the SamplingOnce method. The boolean ball is true when goal_found == true. Instead of rejection method, I have decided to uniformly sample in the spherical coordinates. Then convert it back to Cartesian Coordinates. 
+
+### Other code for Informed RRT*
+
+```
+Eigen::Matrix3d getRotationMatrix(Eigen::Vector3d v1, Eigen::Vector3d v2)
+{
+  // Use the unit vectors to find the rotation matrix
+  // Find the unit vector of both vector
+  v1 /= v1.norm();
+  v2 /= v2.norm();
+  Eigen::Vector3d v = v1.cross(v2);
+  double s = v.norm();
+  double c = v1.dot(v2);
+  Eigen::Matrix3d skew_sym;
+  skew_sym << 0, -v(2), v(1),
+              v(2), 0, -v(0),
+              -v(1), v(0), 0;
+  Eigen::Matrix3d rotation_matrix = Eigen::Matrix3d::Zero(); 
+  rotation_matrix = Eigen::Matrix3d::Identity() + skew_sym + skew_sym * skew_sym * (1 - c) / s / s;
+  return rotation_matrix;
+}
+```
+Here is the implementation to find the rotation matrix that rotate v1 (x axis) to v2 (main axis of the elipse). If I remember this correctly, this is just Rodrigue's formula in a different form.
+
+```
+Eigen::Vector3d center = (s + g) / 2;
+Eigen::Vector3d origin_vec(1, 0, 0);
+Eigen::Matrix3d R_mat = getRotationMatrix(origin_vec, g - s);
+Eigen::Matrix3d S_mat = Eigen::Matrix3d::Zero();
+double c_min = (g - s).norm();
+```
+The code above are computed prior to the main loop, since they are constant for each search. 
+```
+sampler_.samplingOnce(x_rand, goal_found);
+// samplingOnce(x_rand);
+if (goal_found)
+{
+  double c_max = goal_node_->cost_from_start;
+  S_mat(0,0) = c_max;
+  S_mat(1,1) = sqrt(c_max*c_max - c_min*c_min) / 2;
+  S_mat(2,2) = S_mat(1,1);
+  x_rand = R_mat * S_mat * x_rand + center;
+}
+```
+Construct the scaling matrix to form the elipse. Formulas taken from Informed RRT* Paper (https://arxiv.org/abs/1404.2334). 
+
