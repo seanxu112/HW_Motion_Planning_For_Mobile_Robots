@@ -118,12 +118,8 @@ void minimumJerkTrajGen(
     EM <<  1,  t,  t*t,   pow(t,3),    pow(t,4),    pow(t,5),
            0,  1,  2*t, 3*pow(t,2),  4*pow(t,3),  5*pow(t,4),
            0,  0,    2,        6*t, 12*pow(t,2), 20*pow(t,3);
-    std::cout << "Finished here" << std::endl;
     M.block(0, 0, 3, 6) = F0;
     M.block(3+2*3*(pieceNum-1), 2*3*(pieceNum-1), 3, 6) = EM;
-    std::cout << "Finished there" << std::endl;
-
-    std::cout << M << std::endl;
 
     // Compute M inverse
     Eigen::PartialPivLU<Eigen::MatrixXd> LU(M);
