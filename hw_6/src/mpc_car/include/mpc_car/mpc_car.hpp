@@ -58,6 +58,24 @@ class MpcCar {
                      const double& delta) {
     // TODO: set values to Ad_, Bd_, gd_
     // ...
+    Ad_ << 1,    0, -dt_*v*sin(phi),       dt_*cos(phi),
+           0,    1,  dt_*v*cos(phi),       dt_*sin(phi),
+           0,    0,               1, dt_*tan(delta)/ll_,
+           0,    0,               0,                  1;
+    Bd_ <<   0,                               0,
+             0,                               0,
+             0, dt_*v/ll_/cos(delta)/cos(delta),
+           dt_,                               0;
+    gd_ <<                    dt_*v*phi*sin(phi),
+                             -dt_*v*phi*cos(phi),
+          -dt_*v*delta/ll_/cos(delta)/cos(delta),
+                                               0;
+    // std::cout << "Ad_: " << std::endl;
+    // std::cout << Ad_ << std::endl;
+    // std::cout << "Bd_: " << std::endl;
+    // std::cout << Bd_ << std::endl;
+    // std::cout << "gd_: " << std::endl;
+    // std::cout << gd_ << std::endl;
     return;
   }
 
@@ -101,6 +119,13 @@ class MpcCar {
     VectorX x0_delay = x0;
     // TODO: compensate delay
     // ...
+    std::cout << "x0: " << std::endl << x0_delay << std::endl;
+    for (int i = 0; i < std::floor(delay_ / dt_); i++){
+      step(x0_delay, historyInput_[i], dt_);
+      std::cout << "x0: " << std::endl << x0_delay << std::endl;
+    }
+    step(x0_delay, historyInput_[history_length_], delay_ - std::floor(delay_ / dt_));
+    std::cout << "x0: " << std::endl << x0_delay << std::endl;
     return x0_delay;
   }
 
@@ -131,6 +156,8 @@ class MpcCar {
 
     // TODO: set initial value of Ad, Bd, gd
     Ad_.setIdentity();  // Ad for instance
+    Bd_.setZero();
+    gd_.setZero();
     // ...
     // set size of sparse matrices
     P_.resize(m * N_, m * N_);
@@ -164,13 +191,24 @@ class MpcCar {
       Cu_.coeffRef(i * 3 + 0, i * m + 0) = 1;
       lu_.coeffRef(i * 3 + 0, 0) = -a_max_;
       uu_.coeffRef(i * 3 + 0, 0) = a_max_;
-      // ...
 
-      // TODO: set stage constraints of states (v)
-      // -v_max <= v <= v_max
-      // Cx_.coeffRef( ...
-      // lx_.coeffRef( ...
-      // ux_.coeffRef( ...
+      Cu_.coeffRef(i * 3 + 1, i * m + 1) = 1;
+      lu_.coeffRef(i * 3 + 1, 0) = -delta_max_;
+      uu_.coeffRef(i * 3 + 1, 0) = delta_max_;
+
+      if (i != (N_-1))
+      {
+        Cu_.coeffRef(i * 3 + 2, i * m + 1) = -1;
+        Cu_.coeffRef(i * 3 + 2, (i+1) * m + 1) = 1;
+        lu_.coeffRef(i * 3 + 2, 0) = -ddelta_max_ * dt_;
+        uu_.coeffRef(i * 3 + 2, 0) = ddelta_max_ * dt_;
+      }
+      
+      // // TODO: set stage constraints of states (v)
+      // // -v_max <= v <= v_max
+      Cx_.coeffRef(i, i * n + 3) = 1;
+      lx_.coeffRef(i, 0) = -0.1;
+      ux_.coeffRef(i, 0) = v_max_;
     }
     // set predict mats size
     predictState_.resize(N_);
@@ -225,19 +263,31 @@ class MpcCar {
         gg.block(0, 0, n, 1) = gd_;
       } else {
         // TODO: set BB AA gg
-        // ...
+        BB.block(i*n, i*m, n, m) = Bd_;
+        AA.block(i*n, 0, n, n) = Ad_ * AA.block(n*(i-1), 0, n, n);
+        gg.block(i*n, 0, n, 1) = Ad_ * gg.block((i-1)*n, 0, n, 1) + gd_;
+        for (int j=0; j < i; j++)
+          BB.block(i*n, j*m, n, m) = Ad_*BB.block((i-1)*n, j*m, n, m);
       }
       // TODO: set qx
       Eigen::Vector2d xy = s_(s0); // reference (x_r, y_r)
       // qx.coeffRef(...
       // ...
+      qx.coeffRef(i*n, 0) = -xy[0];
+      qx.coeffRef(i*n+1, 0) = -xy[1];
+      qx.coeffRef(i*n+2, 0) = -last_phi;
+
       s0 += desired_v_ * dt_;
       s0 = s0 < s_.arcL() ? s0 : s_.arcL();
     }
+    // std::cout << gg << std::endl;
     Eigen::SparseMatrix<double> BB_sparse = BB.sparseView();
     Eigen::SparseMatrix<double> AA_sparse = AA.sparseView();
     Eigen::SparseMatrix<double> gg_sparse = gg.sparseView();
     Eigen::SparseMatrix<double> x0_sparse = x0.sparseView();
+
+    // std::cout << "BB: " << std::endl;
+    // std::cout << Eigen::MatrixXd(BB).block(0,0, n*N_, 12) << std::endl;
 
     Eigen::SparseMatrix<double> Cx = Cx_ * BB_sparse;
     Eigen::SparseMatrix<double> lx = lx_ - Cx_ * AA_sparse * x0_sparse - Cx_ * gg_sparse;
@@ -256,7 +306,8 @@ class MpcCar {
     }
     Eigen::SparseMatrix<double> BBT_sparse = BB_sparse.transpose();
     P_ = BBT_sparse * Qx_ * BB_sparse;
-    q_ = BBT_sparse * Qx_.transpose() * (AA_sparse * x0_sparse + gg_sparse) + BBT_sparse * qx;
+    q_ = (BBT_sparse * Qx_.transpose() * (AA_sparse * x0_sparse + gg_sparse) + BBT_sparse * qx);
+    // q_ = (BBT_sparse * qx);
     // osqp
     Eigen::VectorXd q_d = q_.toDense();
     Eigen::VectorXd l_d = l_.toDense();
@@ -269,6 +320,8 @@ class MpcCar {
       return ret;
     }
     Eigen::VectorXd sol = qpSolver_.getPrimalSol();
+    
+    // std::cout << Eigen::VectorXd * P_ * sol << std::endl;
     Eigen::MatrixXd solMat = Eigen::Map<const Eigen::MatrixXd>(sol.data(), m, N_);
     Eigen::VectorXd solState = BB * sol + AA * x0 + gg;
     Eigen::MatrixXd predictMat = Eigen::Map<const Eigen::MatrixXd>(solState.data(), n, N_);
@@ -277,6 +330,7 @@ class MpcCar {
       predictInput_[i] = solMat.col(i);
       predictState_[i] = predictMat.col(i);
     }
+    // std::cout << "u: " << std::endl << predictInput_.front() << std::endl;
     return ret;
   }
 
