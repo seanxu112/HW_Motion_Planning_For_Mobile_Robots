@@ -87,7 +87,7 @@ if (i == 0) {
       qx.coeffRef(i*n+2, 0) = -last_phi;
 ```
 
-Setting up the Big Matrix for QP solver from the sub matrix we got from linearization method. Since the system is non-linear, we have to use different A for constructing AA, BB and gg. e.g. instead of A^4, it should be A_4*A_3*A_2*A_1.
+Setting up the Big Matrix for QP solver from the sub matrix we got from linearization method. Since the system is non-linear, we have to use different A for constructing AA, BB and gg. e.g. instead of A^4, it should be A4 * A3* A2 * A1.
 
 ### Compensate Delay
 ```
