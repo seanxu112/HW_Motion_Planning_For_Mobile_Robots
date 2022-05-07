@@ -119,17 +119,21 @@ class MpcCar {
     VectorX x0_delay = x0;
     // TODO: compensate delay
     // ...
+
+    // reduced time step for better estimation
+    // for (int i = 0; i < std::floor(delay_ / 0.001); i++)
+    // {
+    //   int index = std::floor(0.001*i/dt_);
+    //   std::cout << "index: " << index << std::endl;
+    //   step(x0_delay, historyInput_.at(index), 0.001);
+    // }
+    // step(x0_delay, historyInput_.back(), delay_ - 0.001 * std::floor(delay_ / 0.001));
+
     for (int i = 0; i < std::floor(delay_ / dt_); i++)
     {
       step(x0_delay, historyInput_.at(i), dt_);
-      // std::cout << "u: " << std::endl <<  historyInput_.at(i) << std::endl;
-      // std::cout << "x0_delay: " << std::endl << x0_delay << std::endl;
     }
     step(x0_delay, historyInput_.back(), delay_ - dt_ * std::floor(delay_ / dt_));
-    // std::cout << "dt: " << std::endl << delay_ - dt_ * std::floor(delay_ / dt_) << std::endl;
-    // std::cout << "u: " << std::endl <<  historyInput_.back() << std::endl;
-    // std::cout << "x0_delay: " << std::endl << x0_delay << std::endl;
-    
     return x0_delay;
   }
 
