@@ -119,13 +119,17 @@ class MpcCar {
     VectorX x0_delay = x0;
     // TODO: compensate delay
     // ...
-    std::cout << "x0: " << std::endl << x0_delay << std::endl;
-    for (int i = 0; i < std::floor(delay_ / dt_); i++){
-      step(x0_delay, historyInput_[i], dt_);
-      std::cout << "x0: " << std::endl << x0_delay << std::endl;
+    for (int i = 0; i < std::floor(delay_ / dt_); i++)
+    {
+      step(x0_delay, historyInput_.at(i), dt_);
+      // std::cout << "u: " << std::endl <<  historyInput_.at(i) << std::endl;
+      // std::cout << "x0_delay: " << std::endl << x0_delay << std::endl;
     }
-    step(x0_delay, historyInput_[history_length_], delay_ - std::floor(delay_ / dt_));
-    std::cout << "x0: " << std::endl << x0_delay << std::endl;
+    step(x0_delay, historyInput_.back(), delay_ - dt_ * std::floor(delay_ / dt_));
+    // std::cout << "dt: " << std::endl << delay_ - dt_ * std::floor(delay_ / dt_) << std::endl;
+    // std::cout << "u: " << std::endl <<  historyInput_.back() << std::endl;
+    // std::cout << "x0_delay: " << std::endl << x0_delay << std::endl;
+    
     return x0_delay;
   }
 
@@ -196,12 +200,16 @@ class MpcCar {
       lu_.coeffRef(i * 3 + 1, 0) = -delta_max_;
       uu_.coeffRef(i * 3 + 1, 0) = delta_max_;
 
-      if (i != (N_-1))
+      if (i != 0)
       {
-        Cu_.coeffRef(i * 3 + 2, i * m + 1) = -1;
-        Cu_.coeffRef(i * 3 + 2, (i+1) * m + 1) = 1;
+        Cu_.coeffRef(i * 3 + 2, (i) * m + 1) = 1;
+        Cu_.coeffRef(i * 3 + 2, (i-1) * m + 1) = -1;
         lu_.coeffRef(i * 3 + 2, 0) = -ddelta_max_ * dt_;
         uu_.coeffRef(i * 3 + 2, 0) = ddelta_max_ * dt_;
+      }
+      else
+      {
+        Cu_.coeffRef(2, 1) = 1;
       }
       
       // // TODO: set stage constraints of states (v)
@@ -227,6 +235,7 @@ class MpcCar {
     historyInput_.push_back(predictInput_.front());
     lu_.coeffRef(2, 0) = predictInput_.front()(1) - ddelta_max_ * dt_;
     uu_.coeffRef(2, 0) = predictInput_.front()(1) + ddelta_max_ * dt_;
+
     VectorX x0 = compensateDelay(x0_observe_);
     // set BB, AA, gg
     Eigen::MatrixXd BB, AA, gg;
@@ -263,11 +272,21 @@ class MpcCar {
         gg.block(0, 0, n, 1) = gd_;
       } else {
         // TODO: set BB AA gg
+        // BB.block(i*n, i*m, n, m) = Bd_;
+        // gg.block(i*n, 0, n, 1) = gd_;
+        // MatrixA temp_A = Ad_;
+        // for (int j = i-1; j >= 0; j--)
+        // {
+        //   BB.block(i*n, j*m, n, m) = temp_A * Bd_;
+        //   temp_A *= Ad_;
+        // }
+        // AA.block(i*n, 0, n, n) = temp_A;
+
+        for (int j=0; j < i; j++)
+          BB.block(i*n, j*m, n, m) = Ad_*BB.block((i-1)*n, j*m, n, m);
         BB.block(i*n, i*m, n, m) = Bd_;
         AA.block(i*n, 0, n, n) = Ad_ * AA.block(n*(i-1), 0, n, n);
         gg.block(i*n, 0, n, 1) = Ad_ * gg.block((i-1)*n, 0, n, 1) + gd_;
-        for (int j=0; j < i; j++)
-          BB.block(i*n, j*m, n, m) = Ad_*BB.block((i-1)*n, j*m, n, m);
       }
       // TODO: set qx
       Eigen::Vector2d xy = s_(s0); // reference (x_r, y_r)
@@ -307,12 +326,13 @@ class MpcCar {
     Eigen::SparseMatrix<double> BBT_sparse = BB_sparse.transpose();
     P_ = BBT_sparse * Qx_ * BB_sparse;
     q_ = (BBT_sparse * Qx_.transpose() * (AA_sparse * x0_sparse + gg_sparse) + BBT_sparse * qx);
-    // q_ = (BBT_sparse * qx);
     // osqp
     Eigen::VectorXd q_d = q_.toDense();
     Eigen::VectorXd l_d = l_.toDense();
     Eigen::VectorXd u_d = u_.toDense();
     qpSolver_.setMats(P_, q_d, A_, l_d, u_d);
+    // std::cout << "lu_: " << std::endl << l_.block(lx.rows(), 0, 3,1) << std::endl;
+    // std::cout << "Cu_: " << std::endl << A.block(Cx.rows(), 0, 3,3) << std::endl;
     qpSolver_.solve();
     int ret = qpSolver_.getStatus();
     if (ret != 1) {
@@ -320,8 +340,6 @@ class MpcCar {
       return ret;
     }
     Eigen::VectorXd sol = qpSolver_.getPrimalSol();
-    
-    // std::cout << Eigen::VectorXd * P_ * sol << std::endl;
     Eigen::MatrixXd solMat = Eigen::Map<const Eigen::MatrixXd>(sol.data(), m, N_);
     Eigen::VectorXd solState = BB * sol + AA * x0 + gg;
     Eigen::MatrixXd predictMat = Eigen::Map<const Eigen::MatrixXd>(solState.data(), n, N_);
@@ -330,7 +348,6 @@ class MpcCar {
       predictInput_[i] = solMat.col(i);
       predictState_[i] = predictMat.col(i);
     }
-    // std::cout << "u: " << std::endl << predictInput_.front() << std::endl;
     return ret;
   }
 
