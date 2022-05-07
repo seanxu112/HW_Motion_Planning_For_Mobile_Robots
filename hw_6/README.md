@@ -62,7 +62,7 @@ for (int i = 0; i < N_; ++i) {
 }
 ```
 
-Setting up the constraints. Ddelta is a differential constraint, so we have to treat it differently. We also have to treat the first set of constraints of ddelta differently, since some code below sets up a unique constraints on ddelta based on the previous input.
+Setting up the constraints. Mainly just locate the x and u in Cx and Cu, and setup the upper and lower bounds in ux,lx, uu,lu. Ddelta is a differential constraint, so we have to treat it differently. We also have to treat the first set of constraints of ddelta differently, since some code below sets up a unique constraints on ddelta based on the previous input.
 
 ```
 if (i == 0) {
